@@ -1,0 +1,6 @@
+{
+  "name": "SpendTrace",
+  "description": "A high-precision dark mode budget tracker with category breakdowns and monthly filtering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
