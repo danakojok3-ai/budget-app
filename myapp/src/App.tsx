@@ -719,7 +719,7 @@ export default function App() {
   const [categorySearch, setCategorySearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
   const [activeTab, setActiveTab] = useState<"chart" | "trends">("chart");
-  const [selectedSection, setSelectedSection] = useState<"dashboard" | "transactions" | "goals" | "insights" | "export">("dashboard");
+  const [selectedSection, setSelectedSection] = useState<"dashboard" | "transactions" | "goals" | "insights" | "export" | "premium">("dashboard");
   const [showSettings, setShowSettings] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [monthlyGoal, setMonthlyGoal] = useState(1200);
@@ -728,12 +728,35 @@ export default function App() {
   const [passcodeEnabled, setPasscodeEnabled] = useState(true);
   const [addStatus, setAddStatus] = useState<"idle" | "success">("idle");
   const [recentTxId, setRecentTxId] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "whish money" | null>(null);
+  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCVV, setCardCVV] = useState("");
+  const [wishMoney, setWishMoney] = useState("");
 
   useEffect(() => {
     try {
       localStorage.setItem("spendtrace_v2", JSON.stringify(transactions));
     } catch {}
+    const savedPremium = localStorage.getItem("spendtrace_premium");
+    if (savedPremium === "true") setIsPremium(true);
+    const savedPayment = localStorage.getItem("spendtrace_payment_method");
+    if (savedPayment === "card" || savedPayment === "whish money") setPaymentMethod(savedPayment as "card" | "whish money");
+    const savedCard = localStorage.getItem("spendtrace_card_name");
+    if (savedCard) setCardName(savedCard);
+    const savedWish = localStorage.getItem("spendtrace_wish_money");
+    if (savedWish) setWishMoney(savedWish);
   }, [transactions]);
+
+  useEffect(() => {
+    const savedPremium = localStorage.getItem("spendtrace_premium");
+    if (!savedPremium) {
+      setSelectedSection("premium");
+    }
+  }, []);
 
   const monthOptions = useMemo(() => {
     const months = new Set(transactions.map((t) => monthKey(t.date)));
@@ -900,7 +923,9 @@ export default function App() {
       ? "Goals"
       : selectedSection === "insights"
       ? "Insights"
-      : "Export";
+      : selectedSection === "export"
+      ? "Export"
+      : "Premium";
 
   const sectionContent =
     selectedSection === "dashboard" ? (
@@ -1505,7 +1530,7 @@ export default function App() {
           </div>
         </div>
       </>
-    ) : (
+    ) : selectedSection === "export" ? (
       <div style={S.formCard}>
         <div style={S.formTitle}>Export your data</div>
         <p style={{ color: "#cbd5e1", marginTop: 12 }}>
@@ -1536,7 +1561,182 @@ export default function App() {
           Export CSV
         </button>
       </div>
-    );
+    ) : selectedSection === "premium" ? (
+      <div style={S.formCard}>
+        <div style={S.formTitle}>SpendTrace Premium</div>
+        <p style={{ color: "#cbd5e1", marginTop: 12 }}>
+          Unlock advanced features and take full control of your finances.
+        </p>
+        {isPremium && paymentMethod ? (
+          <div style={{ marginTop: 20 }}>
+            <p style={{ color: "#4ade80" }}>✓ Premium Unlocked</p>
+            <p style={{ color: "#cbd5e1", fontSize: 12, marginTop: 8 }}>
+              Cardholder: {cardName}
+            </p>
+            <p style={{ color: "#cbd5e1", fontSize: 12, marginTop: 4 }}>
+              Wish Money Goal: {currencySymbol}{wishMoney}
+            </p>
+            <button
+              style={{ ...S.settingsActionButton, marginTop: 18, background: "#64748b" }}
+              onClick={() => {
+                setIsPremium(false);
+                setPaymentMethod(null);
+                setCardName("");
+                setCardNumber("");
+                setCardExpiry("");
+                setCardCVV("");
+                setWishMoney("");
+                localStorage.removeItem("spendtrace_premium");
+                localStorage.removeItem("spendtrace_payment_method");
+                localStorage.removeItem("spendtrace_card_name");
+                localStorage.removeItem("spendtrace_wish_money");
+              }}
+            >
+              Cancel Subscription
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: 20 }}>
+            <p style={{ color: "#cbd5e1", fontSize: 13, marginBottom: 16 }}>
+              Premium costs $19.99/month. Choose your payment method to unlock premium features.
+            </p>
+            {!showPaymentSetup ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <button
+                  style={{ ...S.settingsActionButton, background: "#3b82f6" }}
+                  onClick={() => setShowPaymentSetup(true)}
+                >
+                  💳 Add Payment Method
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={S.field}>
+                  <label style={S.fieldLabel}>Cardholder Name</label>
+                  <input
+                    style={S.input}
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div style={S.field}>
+                  <label style={S.fieldLabel}>Card Number</label>
+                  <input
+                    style={S.input}
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value.replace(/\s/g, "").replace(/(\d{4})/g, "$1 ").trim())}
+                    placeholder="4532 1111 2222 3333"
+                    maxLength={19}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ ...S.field, flex: 1 }}>
+                    <label style={S.fieldLabel}>Expiry (MM/YY)</label>
+                    <input
+                      style={S.input}
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, "");
+                        if (val.length >= 2) {
+                          val = val.slice(0, 2) + "/" + val.slice(2, 4);
+                        }
+                        setCardExpiry(val);
+                      }}
+                      placeholder="12/25"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div style={{ ...S.field, flex: 1 }}>
+                    <label style={S.fieldLabel}>CVV</label>
+                    <input
+                      style={S.input}
+                      value={cardCVV}
+                      onChange={(e) => setCardCVV(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123"
+                      maxLength={4}
+                      type="password"
+                    />
+                  </div>
+                </div>
+                <div style={S.field}>
+                  <label style={S.fieldLabel}>Wish Money Goal (Monthly Savings Target)</label>
+                  <input
+                    style={S.input}
+                    value={wishMoney}
+                    onChange={(e) => setWishMoney(e.target.value)}
+                    placeholder="e.g. 500"
+                    type="number"
+                  />
+                </div>
+                <button
+                  style={{ ...S.settingsActionButton, background: "#22c55e", marginTop: 8 }}
+                  onClick={() => {
+                    if (cardName && cardNumber && cardExpiry && cardCVV && wishMoney) {
+                      setPaymentMethod("card");
+                      setIsPremium(true);
+                      localStorage.setItem("spendtrace_payment_method", "card");
+                      localStorage.setItem("spendtrace_premium", "true");
+                      localStorage.setItem("spendtrace_card_name", cardName);
+                      localStorage.setItem("spendtrace_wish_money", wishMoney);
+                      setShowPaymentSetup(false);
+                    } else {
+                      alert("Please fill in all fields");
+                    }
+                  }}
+                >
+                  Confirm Payment
+                </button>
+                <button
+                  style={{ ...S.settingsActionButton, background: "#64748b" }}
+                  onClick={() => setShowPaymentSetup(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    ) : null;
+
+  const premiumPaywall = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "60vh",
+        padding: "2rem",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 400,
+          background: "rgba(59,130,246,0.1)",
+          border: "1px solid rgba(59,130,246,0.3)",
+          borderRadius: 28,
+          padding: "2rem",
+        }}
+      >
+        <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+        <h2 style={{ color: "#f8fafc", fontSize: 20, marginBottom: 12 }}>Premium Access Required</h2>
+        <p style={{ color: "#cbd5e1", marginBottom: 20 }}>
+          Set up payment to unlock full access to SpendTrace and manage your finances.
+        </p>
+        <button
+          style={{ ...S.settingsActionButton, width: "100%" }}
+          onClick={() => setSelectedSection("premium")}
+        >
+          Unlock Premium
+        </button>
+      </div>
+    </div>
+  );
+
+  const finalContent = !isPremium && selectedSection !== "premium" ? premiumPaywall : sectionContent;
 
   return (
     <>
@@ -1568,6 +1768,7 @@ export default function App() {
                   { key: "goals", label: "Goals", icon: "🎯", badge: "New" },
                   { key: "insights", label: "Insights", icon: "📈" },
                   { key: "export", label: "Export", icon: "⬇️" },
+                  { key: "premium", label: "Premium", icon: "⭐" },
                 ].map((item) => {
                   const isActive = selectedSection === item.key;
                   return (
@@ -1607,7 +1808,7 @@ export default function App() {
                 <span style={S.periodLabel}>{periodLabel}</span>
               </div>
 
-            {sectionContent}
+            {finalContent}
       </main>
       {showSettings && (
         <div style={S.settingsOverlay} onClick={() => setShowSettings(false)}>
